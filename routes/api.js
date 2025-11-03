@@ -8,7 +8,9 @@ const stockLikes = {};
 module.exports = function (app) {
   app.get('/api/stock-prices', async function (req, res) {
     const { stock, like } = req.query;
-    const ip = req.ip;
+    const ip = req.headers['x-forwarded-for'] || req.ip;
+
+
 
     if (!stock) {
       return res.status(400).json({ error: 'Stock symbol is required' });
