@@ -14,7 +14,7 @@ module.exports = function (app) {
     console.log('query like =', req.query.like);
     console.log('query stock =', req.query.stock);
     const { stock, like } = req.query;
-    const ip = req.headers['x-forwarded-for'] || req.ip;
+    const ip = req.ip; // usar la IP real que Express ya normaliza (requiere app.set('trust proxy', true))
 
 
 
