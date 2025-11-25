@@ -7,6 +7,12 @@ const stockLikes = {};
 
 module.exports = function (app) {
   app.get('/api/stock-prices', async function (req, res) {
+    // DEBUG: ver qué IP y qué query llega
+    console.log('--- incoming request ---');
+    console.log('req.ip =', req.ip);
+    console.log("x-forwarded-for =", req.headers['x-forwarded-for']);
+    console.log('query like =', req.query.like);
+    console.log('query stock =', req.query.stock);
     const { stock, like } = req.query;
     const ip = req.headers['x-forwarded-for'] || req.ip;
 
