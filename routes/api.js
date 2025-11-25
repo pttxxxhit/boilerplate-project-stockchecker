@@ -7,16 +7,8 @@ const stockLikes = {};
 
 module.exports = function (app) {
   app.get('/api/stock-prices', async function (req, res) {
-    // DEBUG: ver qué IP y qué query llega
-    console.log('--- incoming request ---');
-    console.log('req.ip =', req.ip);
-    console.log("x-forwarded-for =", req.headers['x-forwarded-for']);
-    console.log('query like =', req.query.like);
-    console.log('query stock =', req.query.stock);
     const { stock, like } = req.query;
-    const ip = req.ip; // usar la IP real que Express ya normaliza (requiere app.set('trust proxy', true))
-
-
+    const ip = req.ip;
 
     if (!stock) {
       return res.status(400).json({ error: 'Stock symbol is required' });
@@ -33,7 +25,7 @@ module.exports = function (app) {
         )
       );
 
-      const stockDataArray = responses.map((response, i) => {
+      const stockDataArray = responses.map((response) => {
         const symbol = response.data.symbol.toUpperCase();
         const price = response.data.latestPrice;
 
