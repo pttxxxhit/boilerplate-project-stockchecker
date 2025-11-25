@@ -9,6 +9,8 @@ const fccTestingRoutes  = require('./routes/fcctesting.js');
 const runner            = require('./test-runner');
 
 const app = express();
+// decirle a Express que confíe en el proxy (Render/Cloudflare)
+app.set('trust proxy', true);
 app.use(function (req, res, next) {
   res.setHeader(
     'Content-Security-Policy',
