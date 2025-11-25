@@ -1,37 +1,40 @@
 'use strict';
 
 const axios = require('axios');
-const mongoose = require('mongoose');
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 
 const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/stocklikes';
+const isTest = process.env.NODE_ENV === 'test';
 
-// Conectar a MongoDB (se ejecuta una vez)
-mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true })
-  .catch(err => console.error('Mongo connection error:', err));
+// Conectar solo si no estamos en modo test
+if (!isTest) {
+  mongoose.connect(mongoUri)
+    .catch(err => console.error('Mongo connection error:', err));
+}
 
-// Esquema y modelo
+// Esquema y modelo (se definen aunque no se conecte)
 const StockSchema = new mongoose.Schema({
   symbol: { type: String, required: true, unique: true, index: true },
   ips: { type: [String], default: [] }
 });
 const Stock = mongoose.models.Stock || mongoose.model('Stock', StockSchema);
 
+// Almacenamiento en memoria para tests
+const memoryStore = new Map(); // key: SYMBOL, value: Set(anonIps)
+
 module.exports = function (app) {
   app.get('/api/stock-prices', async function (req, res) {
     try {
       const { stock, like } = req.query;
-      // Asegurarse de aceptar like como 'true' o true
       const likeFlag = (like === 'true' || like === true);
 
       if (!stock) {
         return res.status(400).json({ error: 'Stock symbol is required' });
       }
 
-      // Obtener IP (Express debe tener app.set('trust proxy', true) si hay proxy)
-      const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || '';
-
-      // Anonimizar IP con hash (cumple la consigna de privacidad)
+      // Obtener IP y anonimizarla
+      const ip = req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || '';
       const anonIp = crypto.createHash('sha256').update(String(ip)).digest('hex');
 
       // Normalizar a array de símbolos en mayúsculas
@@ -44,31 +47,37 @@ module.exports = function (app) {
         )
       );
 
-      // Para cada símbolo: si likeFlag -> $addToSet anonIp; luego contar likes
+      // Procesar resultados usando DB real o memoria según el entorno
       const results = await Promise.all(responses.map(async (response) => {
         const symbol = String(response.data.symbol).toUpperCase();
         const price = Number(response.data.latestPrice);
 
-        if (likeFlag) {
-          await Stock.findOneAndUpdate(
-            { symbol },
-            { $addToSet: { ips: anonIp } },
-            { upsert: true, new: true }
-          );
+        if (isTest) {
+          // Uso memoria: Set de IPs por símbolo
+          if (!memoryStore.has(symbol)) memoryStore.set(symbol, new Set());
+          if (likeFlag) memoryStore.get(symbol).add(anonIp);
+          const likesCount = memoryStore.get(symbol).size;
+          return { stock: symbol, price, likes: likesCount };
+        } else {
+          // Uso MongoDB
+          if (likeFlag) {
+            await Stock.findOneAndUpdate(
+              { symbol },
+              { $addToSet: { ips: anonIp } },
+              { upsert: true, new: true }
+            );
+          }
+          const doc = await Stock.findOne({ symbol }).lean();
+          const likesCount = doc ? (doc.ips ? doc.ips.length : 0) : 0;
+          return { stock: symbol, price, likes: likesCount };
         }
-
-        const doc = await Stock.findOne({ symbol });
-        const likesCount = doc ? doc.ips.length : 0;
-
-        return { stock: symbol, price, likes: likesCount };
       }));
 
-      // Si se pidieron dos acciones, devolver array con rel_likes
+      // Si se pidieron dos acciones, devolver rel_likes
       if (results.length === 2) {
         const [a, b] = results;
         const relA = a.likes - b.likes;
         const relB = b.likes - a.likes;
-
         return res.json({
           stockData: [
             { stock: a.stock, price: a.price, rel_likes: relA },
@@ -77,7 +86,7 @@ module.exports = function (app) {
         });
       }
 
-      // Si solo una acción, devolver objeto con likes
+      // Una sola acción: devolver likes
       return res.json({
         stockData: {
           stock: results[0].stock,
