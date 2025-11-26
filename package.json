@@ -5,8 +5,6 @@
 	"scripts": {
 		"start": "node server.js",
 		"test": "mocha tests/2_functional-tests.js --timeout 5000"
-
-
 	},
 	"dependencies": {
 		"axios": "^1.13.0",
@@ -16,7 +14,8 @@
 		"cors": "^2.8.1",
 		"dotenv": "^8.2.0",
 		"express": "^4.14.0",
-		"helmet": "^3.1.0"
+		"helmet": "^3.1.0",
+		"mongoose": "^9.0.0"
 	},
 	"repository": {
 		"type": "git",
