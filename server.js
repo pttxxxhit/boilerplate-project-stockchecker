@@ -1,58 +1,62 @@
 'use strict';
 require('dotenv').config();
-const express     = require('express');
-const bodyParser  = require('body-parser');
-const cors        = require('cors');
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
 
-const apiRoutes         = require('./routes/api.js');
-const fccTestingRoutes  = require('./routes/fcctesting.js');
-const runner            = require('./test-runner');
+const apiRoutes = require('./routes/api.js');
+const fccTestingRoutes = require('./routes/fcctesting.js');
+const runner = require('./test-runner');
 
 const app = express();
-// decirle a Express que confíe en el proxy (Render/Cloudflare)
+
+// Confía en el proxy para obtener la IP real (Render, Cloudflare, etc.)
 app.set('trust proxy', true);
-app.use(function (req, res, next) {
+
+// Política de seguridad de contenido requerida por FreeCodeCamp
+app.use((req, res, next) => {
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; script-src 'self'; style-src 'self';"
   );
   next();
 });
+
+// Archivos estáticos y middlewares
 app.use('/public', express.static(process.cwd() + '/public'));
-
-app.use(cors({origin: '*'})); //For FCC testing purposes only
-
+app.use(cors({ origin: '*' })); // Solo para pruebas de FCC
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-//Index page (static HTML)
+// Página principal
 app.route('/')
-  .get(function (req, res) {
+  .get((req, res) => {
     res.sendFile(process.cwd() + '/views/index.html');
   });
 
-//For FCC testing purposes
+// Rutas de testing de FCC (debe ir antes de las rutas de la API)
 fccTestingRoutes(app);
 
-//Routing for API 
-apiRoutes(app);  
-    
-//404 Not Found Middleware
-app.use(function(req, res, next) {
-  res.status(404)
-    .type('text')
-    .send('Not Found');
+// Rutas de la API
+apiRoutes(app);
+
+// 404 Not Found
+app.use((req, res, next) => {
+  res.status(404).type('text').send('Not Found');
 });
 
-//Start our server and tests!
-const listener = app.listen(process.env.PORT || 3000, function () {
+// Arranque del servidor usando el puerto de Render o 3000
+const PORT = process.env.PORT || 3000;
+const listener = app.listen(PORT, function () {
   console.log('Your app is listening on port ' + listener.address().port);
-  if(process.env.NODE_ENV==='test') {
+
+  // Ejecutar tests solo en entorno de test (local)
+  if (process.env.NODE_ENV === 'test') {
     console.log('Running Tests...');
     setTimeout(function () {
       try {
         runner.run();
-      } catch(e) {
+      } catch (e) {
         console.log('Tests are not valid:');
         console.error(e);
       }
@@ -60,4 +64,5 @@ const listener = app.listen(process.env.PORT || 3000, function () {
   }
 });
 
-module.exports = app; //for testing
+// Exportar la app para que las pruebas de FCC la importen
+module.exports = app;
